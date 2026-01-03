@@ -1,0 +1,9 @@
+langchain
+langchain-community
+langchain-huggingface
+langchain-ollama
+faiss-cpu
+pypdf
+sentence-transformers
+colorama
+numpy<2

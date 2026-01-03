@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+
+# Data
+data/docs/*
+!data/docs/.gitkeep
+vectorstore/faiss_index/
+
+# Env
+.env
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Testing
+debug_*.py
