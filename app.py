@@ -31,17 +31,17 @@ def ingest_data():
     add_documents_to_store(chunks)
     print(Fore.GREEN + "=== Ingestion Complete ===")
 
-def query_loop(api_url=None):
+def query_loop(api_url=None, mode="standard", verbose=False):
     """Starts the interactive query loop."""
     print(Fore.CYAN + "=== Personal Knowledge Base (Local RAG - FAISS) ===")
-    print(Fore.YELLOW + "Loading Vector Database & Model...")
+    print(Fore.YELLOW + f"Loading Vector Database & Model (Mode: {mode})...")
     
     try:
         vectorstore = get_vectorstore()
         if vectorstore is None:
              print(Fore.RED + "Index not found! Please run 'python app.py ingest' first.")
              return
-        qa_system = LocalRAGQA(vectorstore, base_url=api_url)
+        qa_system = LocalRAGQA(vectorstore, base_url=api_url, mode=mode, verbose=verbose)
     except Exception as e:
         print(Fore.RED + f"Failed to initialize system: {e}")
         return
@@ -76,6 +76,8 @@ def main():
     parser.add_argument('mode', nargs='?', choices=['ingest', 'chat'], default='chat', help="Mode: 'ingest' or 'chat'")
     parser.add_argument('--query', '-q', type=str, help="Run a single query and exit")
     parser.add_argument('--api-url', type=str, help="URL for remote Ollama server (e.g. ngrok URL)")
+    parser.add_argument('--query-mode', type=str, default="standard", choices=["standard", "summarize", "explain_simple", "exam"], help="Query interaction mode")
+    parser.add_argument('--verbose', '-v', action='store_true', help="Enable verbose diagnostics")
     
     args = parser.parse_args()
     
@@ -89,7 +91,7 @@ def main():
             if vectorstore is None:
                 print(Fore.RED + "Index not found!")
                 return
-            qa_system = LocalRAGQA(vectorstore, base_url=args.api_url)
+            qa_system = LocalRAGQA(vectorstore, base_url=args.api_url, mode=args.query_mode, verbose=args.verbose)
             print(Fore.CYAN + f"Query: {args.query}")
             print(Fore.CYAN + "Thinking...", end= " ", flush=True)
             print()
@@ -97,7 +99,7 @@ def main():
                 print(chunk, end="", flush=True)
             print("\n")
         else:
-            query_loop(api_url=args.api_url)
+            query_loop(api_url=args.api_url, mode=args.query_mode, verbose=args.verbose)
 
 if __name__ == "__main__":
     main()

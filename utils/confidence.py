@@ -1,51 +1,65 @@
 from typing import List, Tuple
 
-def calculate_confidence(docs_with_score: List[Tuple[object, float]]) -> Tuple[str, float, str]:
+def calculate_confidence(docs_with_score: List[Tuple[object, float]]) -> dict:
     """
-    Calculates a confidence score based on similarity scores and count of retrieved docs.
+    Calculates detailed confidence metrics.
     
-    Args:
-        docs_with_score: List of (Document, score) tuples. 
-                         Chroma usually returns distance (lower is better) or similarity (higher is better).
-                         langchain-chroma default similarity_search_with_score returns L2 distance by default for default collection?
-                         Actually, let's assume we use standard similarity which often confusingly returns distance for chroma.
-                         However, sentence-transformers usually uses cosine similarity.
-                         
-                         Let's handle standard Chroma usage: default space is usually L2 (Squared L2) or Cosine Distance.
-                         Lower score = more similar.
-                         
-                         If we assume Cosine Distance: 0.0 is identical, 1.0 is opposite.
-                         
-    Returns:
-        Tuple[str, float, str]: (Label, Score, Explanation)
+    Returns a dict with:
+    - label: "High", "Medium", "Low", "No Answer"
+    - score: 0-100 float
+    - explanation: str
+    - safe_to_answer: bool (True if we should proceed with generation)
+    - details: dict (raw stats)
     """
     if not docs_with_score:
-        return "Low", 0.0, "No documents found."
+        return {
+            "label": "No Answer",
+            "score": 0.0,
+            "explanation": "No matching documents found.",
+            "safe_to_answer": False,
+            "details": {}
+        }
 
-    # Inspect scores to guess interpretation
     scores = [score for doc, score in docs_with_score]
+    # FAISS L2 Distance: Lower is better.
+    # 0.0 = exact match. 
+    # > 1.0 = poor match.
+    
+    top_1_score = min(scores)
     avg_score = sum(scores) / len(scores)
     
-    # Heuristic for Chroma L2/Cosine distance (Lower is better)
-    # A generic cutoff for "good" matches in MiniLM/Chroma context:
-    # < 0.3 or 0.4 is usually quite relevant.
-    # > 1.0 is usually irrelevant.
+    # Heuristics for L2 Distance
+    # Thresholds need tuning based on embeddings (MiniLM-L6-v2)
+    SAFE_THRESHOLD = 1.1  # If top match is > 1.1 distance, it's likely irrelevant
+    HIGH_CONFIDENCE_THRESHOLD = 0.5
     
-    # Inverting logic for user display: Confidence %
-    # Let's approximate: 0.0 distance -> 100% confidence. 1.0 distance -> 0%.
-    # This is a rough heuristic.
+    safe_to_answer = top_1_score < SAFE_THRESHOLD
     
-    confidence_value = max(0.0, 1.0 - avg_score) * 100
+    # Convert distance to a 0-100 score for display
+    # This is an approximation
+    display_score = max(0.0, 1.2 - avg_score) / 1.2 * 100
     
     label = "Low"
-    if confidence_value > 70:
+    if not safe_to_answer:
+        label = "Unsafe / No Answer"
+    elif display_score > 75:
         label = "High"
-    elif confidence_value > 40:
+    elif display_score > 50:
         label = "Medium"
         
     explanation = (
-        f"Based on {len(docs_with_score)} sources with average distance score of {avg_score:.4f}. "
-        f"(Lower distance is better)"
+        f"Top match distance: {top_1_score:.4f} (Threshold: {SAFE_THRESHOLD}). "
+        f"Avg distance: {avg_score:.4f} across {len(scores)} chunks."
     )
     
-    return label, confidence_value, explanation
+    return {
+        "label": label,
+        "score": display_score,
+        "explanation": explanation,
+        "safe_to_answer": safe_to_answer,
+        "details": {
+            "top_1": top_1_score,
+            "average": avg_score,
+            "count": len(scores)
+        }
+    }

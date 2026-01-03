@@ -16,13 +16,16 @@ def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
 class LocalRAGQA:
-    def __init__(self, vectorstore, model_name=MODEL_NAME, base_url=None):
+    def __init__(self, vectorstore, model_name=MODEL_NAME, base_url=None, mode="standard", verbose=False):
         self.vectorstore = vectorstore
         self.retriever = get_retriever(vectorstore)
-        self.prompt = get_prompt_template()
+        self.mode = mode
+        self.verbose = verbose
+        # Select prompt based on mode
+        self.prompt = get_prompt_template(mode)
         
         # Initialize Ollama LLM
-        print(f"Initializing local LLM: {model_name}...")
+        print(f"Initializing local LLM: {model_name} (Mode: {mode})...")
         if base_url:
             print(f"Using remote Ollama API at: {base_url}")
             self.llm = OllamaLLM(
@@ -32,40 +35,61 @@ class LocalRAGQA:
             )
         else:
             self.llm = OllamaLLM(model=model_name)
-        
-        self.chain = (
-            {"context": self.retriever | format_docs, "question": RunnablePassthrough()}
-            | self.prompt
-            | self.llm
-            | StrOutputParser()
-        )
-
+    
     def stream_answer(self, question: str) -> Generator[str, None, None]:
         """
         Generator that streams the answer chunks.
         """
         # 1. Retrieval
-        # FAISS search_with_score returns L2 distance (lower is better) or inner product depending on index.
-        # Default HuggingFaceEmbeddings + FAISS usually uses L2 distance (Euclidean).
-        docs_with_scores = self.vectorstore.similarity_search_with_score(question, k=3)
-        context_text = "\n\n".join([doc.page_content for doc, _ in docs_with_scores])
+        docs_with_scores = self.vectorstore.similarity_search_with_score(question, k=5)
         
-        # 2. Stream Generation
+        # 2. Confidence Check (Strong No-Answer Detection)
+        conf_result = calculate_confidence(docs_with_scores)
+        
+        if self.verbose:
+            print("\n[DIAGNOSTICS]")
+            print(f"Top Score: {conf_result['details']['top_1']:.4f}")
+            print(f"Avg Score: {conf_result['details']['average']:.4f}")
+            print(f"Safe to Answer: {conf_result['safe_to_answer']}")
+            print("-" * 20)
+
+        # Skip generation if unsafe
+        if not conf_result['safe_to_answer']:
+            yield "I cannot find the answer in the provided documents (Confidence too low)."
+            # Yield metadata anyway so user sees why
+            yield self._format_metadata(conf_result, docs_with_scores)
+            return
+
+        # 3. Stream Generation
+        context_text = "\n\n".join([doc.page_content for doc, _ in docs_with_scores])
         prompt_val = self.prompt.invoke({"context": context_text, "question": question})
         
         for chunk in self.llm.stream(prompt_val):
             yield chunk
             
-        # 3. Yield Metadata
-        confidence_label, confidence_score, explanation = calculate_confidence(docs_with_scores)
-        
+        # 4. Yield Metadata
+        yield self._format_metadata(conf_result, docs_with_scores)
+
+    def _format_metadata(self, conf_result, docs_with_scores):
+        """Formats the metadata footer with source grouping."""
         metadata_str = "\n\n--- METADATA ---\n"
-        metadata_str += f"Confidence: {confidence_label} ({confidence_score:.1f}%)\n"
-        metadata_str += f"Explanation: {explanation}\n"
+        metadata_str += f"Confidence: {conf_result['label']} ({conf_result['score']:.1f}%)\n"
+        metadata_str += f"Explanation: {conf_result['explanation']}\n"
         metadata_str += "Sources:\n"
-        for i, (doc, score) in enumerate(docs_with_scores):
-            source = doc.metadata.get('source', 'Unknown')
+        
+        # Group by Source File
+        grouped_sources = {}
+        for doc, score in docs_with_scores:
+            source = os.path.basename(doc.metadata.get('source', 'Unknown'))
             page = doc.metadata.get('page', 'N/A')
-            metadata_str += f"{i+1}. {os.path.basename(source)} (Page {page}) - Dist: {score:.4f}\n"
+            if source not in grouped_sources:
+                grouped_sources[source] = []
+            grouped_sources[source].append(f"Page {page} (Dist: {score:.4f})")
             
-        yield metadata_str
+        # Format Grouped Sources
+        for i, (source, details) in enumerate(grouped_sources.items()):
+            metadata_str += f"{i+1}. {source}\n"
+            for detail in details:
+                metadata_str += f"   - {detail}\n"
+                
+        return metadata_str

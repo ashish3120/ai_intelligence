@@ -13,6 +13,10 @@ def chunk_documents(documents: List[Document], chunk_size: int = 500, chunk_over
         
     Returns:
         List[Document]: A list of chunked documents.
+    
+    Optimization Note:
+    - Default size 500 is good for general use.
+    - For 16GB RAM and large docs, try 800 or 1000 to keep more context per retrieval.
     """
     print(f"Chunking {len(documents)} documents with size={chunk_size}, overlap={chunk_overlap}...")
     
