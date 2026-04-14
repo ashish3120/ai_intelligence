@@ -6,4 +6,6 @@ faiss-cpu
 pypdf
 sentence-transformers
 colorama
-numpy<2
+numpy
+python-dotenv
+langchain-groq

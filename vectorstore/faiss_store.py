@@ -6,7 +6,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 
 # Constants
-PERSIST_DIR = r"D:\ai_intelligence\personal-kb\vectorstore\faiss_index"
+PERSIST_DIR = r"D:\ai_intelligence\vectorstore\faiss_index"
 INDEX_NAME = "index"
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 

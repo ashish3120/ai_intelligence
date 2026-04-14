@@ -30,14 +30,14 @@ def calculate_confidence(docs_with_score: List[Tuple[object, float]]) -> dict:
     
     # Heuristics for L2 Distance
     # Thresholds need tuning based on embeddings (MiniLM-L6-v2)
-    SAFE_THRESHOLD = 1.1  # If top match is > 1.1 distance, it's likely irrelevant
-    HIGH_CONFIDENCE_THRESHOLD = 0.5
+    SAFE_THRESHOLD = 1.6  # If top match is > 1.6 distance, it's likely irrelevant
+    HIGH_CONFIDENCE_THRESHOLD = 1.0
     
     safe_to_answer = top_1_score < SAFE_THRESHOLD
     
     # Convert distance to a 0-100 score for display
     # This is an approximation
-    display_score = max(0.0, 1.2 - avg_score) / 1.2 * 100
+    display_score = max(0.0, 2.0 - avg_score) / 2.0 * 100
     
     label = "Low"
     if not safe_to_answer:

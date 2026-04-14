@@ -3,6 +3,9 @@ os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 import sys
 import argparse
 from colorama import init, Fore, Style
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Initialize colorama
 init(autoreset=True)
@@ -14,7 +17,7 @@ from ingest.chunker import chunk_documents
 from vectorstore.faiss_store import add_documents_to_store, get_vectorstore
 from rag.qa import LocalRAGQA
 
-DOCS_DIR = r"D:\ai_intelligence\personal-kb\data\docs"
+DOCS_DIR = r"D:\ai_intelligence\data\docs"
 
 def ingest_data():
     """Runs the ingestion pipeline."""

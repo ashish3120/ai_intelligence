@@ -1,29 +1,25 @@
-# Personal Knowledge Base (RAG) - Hybrid & Local
+# Personal Knowledge Base (RAG) - Groq Edition
 
-**A robust, privacy-focused RAG system designed for Windows.**  
-Run fully local (16GB RAM) or partially on the cloud (Google Colab GPU) for faster inference, while keeping your documents private on your machine.
+**A lightning-fast Retrieval-Augmented Generation (RAG) system running on Groq.**  
+Privately index your documents locally, and use Groq's high-speed inference endpoints to query them interactively. 
 
 ---
 
 ## 🚀 Features
-- **Privacy First**: Your documents (`.pdf`, `.txt`, `.md`) are processed and stored locally on your `D:` drive. They never leave your computer.
-- **Dual Mode**:
-    - **Local Mode**: Uses your PC's 16GB RAM to run `llama3.1` (8B) or similar models via Ollama.
-    - **Hybrid Mode**: Offload heavy LLM processing to Google Colab (Tesla T4 GPU) via free Ngrok tunnel, while keeping embeddings and vectors local.
-- **Smart Retrieval**: Uses FAISS vector search with `all-MiniLM-L6-v2` embeddings for fast, accurate context.
-- **Confidence Scoring**: Every answer includes a confidence score and source citations so you know where the info came from.
+- **Privacy First (Local Storage)**: Your documents (`.pdf`, `.txt`, `.md`) and their FAISS vector representations are processed and stored locally on your machine.
+- **Lightning Fast Inference**: By leveraging the Groq API (`llama-3.1-8b-instant`), the LLM inference is near-instantaneous.
+- **Smart Retrieval**: Uses FAISS vector search with `all-MiniLM-L6-v2` embeddings for fast, accurate context retrieval.
+- **Source Citations & Confidence**: Every answer includes a confidence score, thresholds, and exact source citations so you know exactly where the information came from.
 
 ## 🛠️ Prerequisites
 - **Python 3.10+**
-- **Ollama** (for Local Mode)
-- **Google Account** (for Hybrid Mode - Colab)
-- **Ngrok Account** (Free tier is fine - for Hybrid Mode)
+- **Groq API Key**: Get one for free from the [Groq Console](https://console.groq.com/keys).
 
 ## 📦 Installation
 
-1.  **Clone/Navigate to Project**:
+1.  **Clone or Navigate to the Project**:
     ```bash
-    cd D:\ai_intelligence\personal-kb
+    cd D:\ai_intelligence
     ```
 
 2.  **Install Dependencies**:
@@ -31,11 +27,11 @@ Run fully local (16GB RAM) or partially on the cloud (Google Colab GPU) for fast
     pip install -r requirements.txt
     ```
 
-3.  **Setup Local Ollama (Optional - for Local Mode)**:
-    - Install Ollama from [ollama.com](https://ollama.com).
-    - Pull the default model:
-      ```bash
-      ollama pull llama3.1
+3.  **Setup your API Key**:
+    - Create a new file in the root directory named `.env`.
+    - Add your Groq API key inside:
+      ```env
+      GROQ_API_KEY=gsk_YOUR_GROQ_API_KEY_HERE
       ```
 
 ---
@@ -43,68 +39,54 @@ Run fully local (16GB RAM) or partially on the cloud (Google Colab GPU) for fast
 ## 🏃 Usage
 
 ### 1. Add Your Data
-Place your documents documents in the `data/docs` folder:
-- `D:\ai_intelligence\personal-kb\data\docs\`
+Place your documents inside the `data/docs` folder:
+- Path: `D:\ai_intelligence\data\docs\`
 - Supported formats: **PDF, TXT, Markdown**.
 
 ### 2. Ingest Data (Build/Update Knowledge Base)
-Run this command whenever you add new files. It creates the vector index locally.
+Run this command whenever you add or modify files. It creates and updates the vector indices locally based on your documents.
 ```bash
 python app.py ingest
 ```
 
 ### 3. Run the Chat Interface
-
-#### **Option A: Fully Local Mode (Requires 16GB RAM)**
-Ensure Ollama is running (`ollama serve`), then:
+Once your data is ingested, start the interactive chat terminal to query your data seamlessly:
 ```bash
 python app.py
 ```
-
-#### **Option B: Hybrid Mode (Google Colab - Recommended for Speed)**
-1.  **Prepare Server**:
-    - Upload `colab_ollama_server_v2.ipynb` to [Google Colab](https://colab.research.google.com).
-    - Change Runtime type to **T4 GPU**.
-    - Add your **Ngrok Authtoken** in the code cell.
-    - Run all cells. Copy the output URL (e.g., `https://xyz.ngrok-free.app`).
-
-2.  **Connect Locally**:
-    ```bash
-    python app.py --api-url "https://your-ngrok-url.ngrok-free.app"
-    ```
 
 ---
 
 ## 🔍 Examples
 
-**Hybrid Run Command**:
+**Single Terminal Query**:
 ```bash
-python app.py --api-url "https://odontophorous-renetta-unpoisoned.ngrok-free.dev"
+python app.py -q "What is the secret code for this project?"
 ```
 
-**Query Interaction**:
+**Query Interaction Output Example**:
 ```text
-Query: what is the project name?
-
-Thinking...
-Project Alpha.
+Query: What is the secret code for this project?
+Thinking... 
+Based on the provided context, the secret code for this project is ALPHA-TANGO-77.
 
 --- METADATA ---
 Confidence: High (98.2%)
-Explanation: Based on 1 sources with very low distance score.
+Explanation: Top match distance: 0.8521 (Threshold: 1.6). Avg distance: 0.8521 across 1 chunks.
 Sources:
-1. data1.txt (Page N/A) - Dist: 0.1234
+1. test_doc.txt
+   - Page N/A (Dist: 0.8521)
 ```
 
 ## 📂 Project Structure
 - `app.py`: Main entry point (CLI & Chat loop).
-- `rag/`: Core RAG logic (Retrieval, Prompting, QA Chain).
-- `ingest/`: Document loading and chunking logic.
-- `vectorstore/`: FAISS database management.
-- `data/docs/`: **PUT YOUR FILES HERE**.
-- `colab_ollama_server_v2.ipynb`: Notebook to run the LLM server on Colab.
+- `rag/qa.py`: Core RAG logic tied to LangChain and Groq.
+- `rag/retriever.py` & `rag/prompt.py`: Defines prompting strategies and FAISS retrieval.
+- `ingest/`: Document loading and text-splitting (chunking) logic.
+- `vectorstore/faiss_store.py`: Local FAISS database generation and management.
+- `data/docs/`: **PUT YOUR FILES HERE TO BE SEARCHED**.
 
 ## ⚠️ Troubleshooting
-- **Protobuf Error**: If you see protocol buffer errors, the app automatically handles this, but ensure `google-api-core` is up to date if issues persist.
-- **No Index Found**: You must run `python app.py ingest` at least once before chatting.
-- **Ngrok Errors**: Check if the Colab notebook is still running. Free tunnels expire after some time locally or if the Colab tab is closed.
+- **No Index Found**: You must run `python app.py ingest` at least once before chatting. If you didn't ingest anything, the search algorithms will crash.
+- **Protobuf Error**: If you see protocol buffer errors, the app handles this mostly via environment variables, but ensure packages like `google-api-core` are up to date if you modify it to use Google integration.
+- **Model Decommissioned Error**: Groq frequently updates their models. If you encounter an error saying a model is decommissioned, head into `rag/qa.py` and change the `ChatGroq(model_name="...")` to the latest model name from the Groq docs.

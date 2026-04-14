@@ -1,6 +1,6 @@
 import time
 from typing import Dict, Any, Generator
-from langchain_ollama import OllamaLLM
+from langchain_groq import ChatGroq
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 import os
@@ -24,17 +24,9 @@ class LocalRAGQA:
         # Select prompt based on mode
         self.prompt = get_prompt_template(mode)
         
-        # Initialize Ollama LLM
-        print(f"Initializing local LLM: {model_name} (Mode: {mode})...")
-        if base_url:
-            print(f"Using remote Ollama API at: {base_url}")
-            self.llm = OllamaLLM(
-                model=model_name, 
-                base_url=base_url,
-                headers={"ngrok-skip-browser-warning": "true"}
-            )
-        else:
-            self.llm = OllamaLLM(model=model_name)
+        # Initialize Groq LLM
+        print(f"Initializing Groq LLM (Mode: {mode})...")
+        self.llm = ChatGroq(model_name="llama-3.1-8b-instant")
     
     def stream_answer(self, question: str) -> Generator[str, None, None]:
         """
@@ -62,10 +54,13 @@ class LocalRAGQA:
 
         # 3. Stream Generation
         context_text = "\n\n".join([doc.page_content for doc, _ in docs_with_scores])
-        prompt_val = self.prompt.invoke({"context": context_text, "question": question})
         
-        for chunk in self.llm.stream(prompt_val):
-            yield chunk
+        chain = self.prompt | self.llm | StrOutputParser()
+        for chunk in chain.stream({"context": context_text, "question": question}):
+            if isinstance(chunk, str):
+                yield chunk
+            else:
+                yield chunk.content
             
         # 4. Yield Metadata
         yield self._format_metadata(conf_result, docs_with_scores)
